@@ -1,0 +1,63 @@
+---
+- name: Lister les domaines déjà joints
+  ansible.builtin.command:
+    cmd: realm list --name-only
+  register: ad_linux_realms
+  changed_when: false
+
+- name: Vérifier que le compte et le mot de passe de jonction sont fournis
+  ansible.builtin.assert:
+    that:
+      - ad_join_user | length > 0
+      - ad_join_password | length > 0
+    fail_msg: >-
+      ad_join_user ou ad_join_password est vide. Le mot de passe doit venir
+      du vault (vault_ad_join_password).
+    quiet: true
+  when: ad_domain not in ad_linux_realms.stdout_lines
+
+- name: Joindre le domaine
+  when: ad_domain not in ad_linux_realms.stdout_lines
+  vars:
+    # Sortie d'erreur de realm/adcli ; le mot de passe y est masqué par précaution.
+    ad_linux_join_stderr: >-
+      {{ ad_linux_join.stderr | default('') | replace(ad_join_password, '********') }}
+    ad_linux_join_hint_spn: >-
+      Erreur 0x21C7 : SPN en double dans la forêt. Le message « Insufficient
+      permissions » est trompeur, ce n'est PAS un problème de droits. Sur un DC,
+      chercher le doublon (domaines enfants compris) avec :
+      setspn -F -Q */{{ ansible_facts['hostname'] }}*
+      puis supprimer ou corriger l'objet en conflit et relancer.
+    ad_linux_join_hint_perms: >-
+      Droits insuffisants pour {{ ad_join_user }}. Vérifier : la délégation sur
+      l'OU ({{ ad_computer_ou | default('conteneur par défaut', true) }}),
+      le quota ms-DS-MachineAccountQuota, ou un objet ordinateur
+      « {{ ansible_facts['hostname'] }} » déjà existant et appartenant à un autre compte.
+    ad_linux_join_hint_other: >-
+      Cause non reconnue. Voir la sortie ci-dessus et « journalctl -u realmd ».
+    # 000021C7 est testé en premier : cette erreur s'affiche aussi comme
+    # « Insufficient permissions ».
+    ad_linux_join_hint: >-
+      {{ ad_linux_join_hint_spn if '000021C7' in (ad_linux_join_stderr | upper)
+         else (ad_linux_join_hint_perms if 'insufficient permissions' in (ad_linux_join_stderr | lower)
+               else ad_linux_join_hint_other) }}
+  block:
+    - name: Exécuter realm join (mot de passe sur stdin)
+      ansible.builtin.command:
+        argv: >-
+          {{ ['realm', 'join', '--verbose', '--user=' ~ ad_join_user]
+             + (['--computer-ou=' ~ ad_computer_ou] if (ad_computer_ou | length > 0) else [])
+             + [ad_domain] }}
+        stdin: "{{ ad_join_password }}"
+      register: ad_linux_join
+      changed_when: true
+      no_log: true
+
+  rescue:
+    - name: Afficher l'erreur de realm/adcli
+      ansible.builtin.debug:
+        msg: "{{ ad_linux_join_stderr.splitlines() }}"
+
+    - name: Arrêter avec un indice de diagnostic
+      ansible.builtin.fail:
+        msg: "Échec de la jonction à {{ ad_domain }}. {{ ad_linux_join_hint }}"

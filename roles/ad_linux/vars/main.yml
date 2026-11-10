@@ -1,0 +1,23 @@
+---
+# Variables internes du rôle (ne pas surcharger).
+
+# Suffixe des noms de groupes tels que SSSD les renvoie
+ad_linux_group_suffix: "{{ ('@' ~ (ad_domain | lower)) if (ad_use_fully_qualified_names | bool) else '' }}"
+
+# Groupes autorisés à se connecter : admins + DBA (si activé) + groupes de l'hôte.
+# En minuscules : SSSD renvoie les noms AD en minuscules.
+ad_linux_login_groups: >-
+  {{ (ad_admin_groups
+      + ([dba_group] if (dba_enabled | bool) else [])
+      + ad_host_login_groups)
+     | map('lower') | select | unique | list }}
+
+# Groupe DBA tel que vu par le système (pour chown/chgrp)
+ad_linux_dba_group_system: "{{ dba_group | lower }}{{ ad_linux_group_suffix }}"
+
+ad_linux_sudo_bin: /usr/bin/sudo
+ad_linux_sudo_classic_bin: /usr/bin/sudo.ws
+ad_linux_visudo_bin: /usr/sbin/visudo
+ad_linux_visudo_classic_bin: /usr/sbin/visudo.ws
+# Les regex dans sudoers n'existent que depuis sudo 1.9.10
+ad_linux_sudo_regex_min_version: "1.9.10"

@@ -1,0 +1,7 @@
+---
+- name: Intégrer les serveurs Linux au domaine Active Directory
+  hosts: linux_ad
+  become: true
+  gather_facts: true
+  roles:
+    - role: ad_linux

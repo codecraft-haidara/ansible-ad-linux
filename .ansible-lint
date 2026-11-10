@@ -1,0 +1,13 @@
+---
+# var-naming[no-role-prefix] : la règle voudrait que toute variable du rôle
+# commence par « ad_linux_ ». Les variables publiques du rôle (ad_*, dba_*)
+# portent volontairement des noms courts : ce sont celles de l'inventaire
+# (ad_computer_ou, dba_enabled, dba_pkg_mode...) et les renommer casserait
+# l'interface convenue. Les variables internes, elles, sont bien préfixées
+# « ad_linux_ ».
+skip_list:
+  - var-naming[no-role-prefix]
+
+exclude_paths:
+  - tests/rendered/
+  - inventory/group_vars/all/vault.yml

@@ -1,0 +1,16 @@
+---
+ad_linux_packages:
+  - realmd
+  - sssd
+  - sssd-tools
+  - adcli
+  - samba-common-tools
+  - oddjob
+  - oddjob-mkhomedir
+  - krb5-workstation
+  - authselect
+
+ad_linux_pkg_cmd: /usr/bin/dnf
+ad_linux_pkg_update_args: makecache
+# Nom de paquet RPM : majuscules et « _ » admis ; jamais de « - » en tête.
+ad_linux_pkg_name_regex: "[A-Za-z0-9][A-Za-z0-9._+-]*"

@@ -1,0 +1,14 @@
+---
+- name: Installer les paquets (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ ad_linux_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Installer les paquets (Red Hat)
+  ansible.builtin.dnf:
+    name: "{{ ad_linux_packages }}"
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'

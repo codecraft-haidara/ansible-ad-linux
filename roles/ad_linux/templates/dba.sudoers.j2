@@ -1,0 +1,31 @@
+# {{ ansible_managed }}
+# Droits des DBA. Aucun joker « * » dans les arguments.
+{% set grp = '%' ~ (dba_group | lower | replace(' ', '\\ ')) ~ ad_linux_group_suffix %}
+
+# Commandes de service exactes. Pas de « systemctl status » : pager less = shell root.
+Cmnd_Alias DBA_SVC = {{ dba_service_commands | join(', \\\n                     ') }}
+{% if ad_linux_dba_pkg_mode == 'regex' %}
+
+# Installation de paquets par regex : tout argument commençant par « - » est
+# refusé (ex. -o APT::Update::Pre-Invoke::=/bin/sh), ainsi que « paquet- ».
+Cmnd_Alias DBA_PKG = {{ ad_linux_pkg_cmd }} {{ ad_linux_pkg_update_args }}, \
+                     {{ ad_linux_pkg_cmd }} ^install( -y)?( {{ ad_linux_pkg_name_regex }})+$
+{% elif ad_linux_dba_pkg_mode == 'list' %}
+
+# Installation de paquets : liste blanche exacte.
+Cmnd_Alias DBA_PKG = {{ ad_linux_pkg_cmd }} {{ ad_linux_pkg_update_args }}
+{%- for p in dba_pkg_whitelist %}, \
+                     {{ ad_linux_pkg_cmd }} install {{ p }}, \
+                     {{ ad_linux_pkg_cmd }} install -y {{ p }}
+{%- endfor %}
+
+{% endif %}
+{% if ad_linux_sudo_iolog_ok and (dba_io_logging | bool) %}
+
+# Journalisation des sessions (entrées et sorties)
+Defaults:{{ grp }} log_input, log_output
+{% endif %}
+
+{{ grp }} ALL=(root) DBA_SVC{{ ', DBA_PKG' if ad_linux_dba_pkg_mode in ['regex', 'list'] else '' }}
+# Sauvegardes et administration sous le compte du moteur (pg_dump, sudo -iu ...)
+{{ grp }} ALL=({{ dba_run_as_users | join(', ') }}) ALL

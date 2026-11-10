@@ -1,0 +1,3 @@
+# Le vault chiffré peut être versionné ; jamais son mot de passe.
+.vault_pass*
+tests/rendered/

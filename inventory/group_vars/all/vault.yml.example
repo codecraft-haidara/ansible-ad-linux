@@ -1,0 +1,5 @@
+---
+# Modèle. Créer le vrai fichier chiffré avec :
+#   ansible-vault create inventory/group_vars/all/vault.yml
+# et y mettre le mot de passe du compte de jonction (ad_join_user).
+vault_ad_join_password: "CHANGER_MOI"

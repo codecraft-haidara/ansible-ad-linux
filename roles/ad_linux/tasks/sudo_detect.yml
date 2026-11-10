@@ -1,0 +1,66 @@
+---
+# Ubuntu 25.10+ : /usr/bin/sudo pointe vers sudo-rs, qui ne gère ni
+# log_input/log_output ni les regex. Le sudo classique reste là sous sudo.ws.
+- name: Chercher le sudo classique (sudo.ws)
+  ansible.builtin.stat:
+    path: "{{ ad_linux_sudo_classic_bin }}"
+  register: ad_linux_sudo_ws
+
+- name: Basculer l'alternative sudo vers le sudo classique
+  community.general.alternatives:
+    name: sudo
+    path: "{{ ad_linux_sudo_classic_bin }}"
+    state: selected
+  when:
+    - ad_force_classic_sudo | bool
+    - ad_linux_sudo_ws.stat.exists
+
+- name: Lire la version du sudo actif
+  ansible.builtin.command:
+    cmd: "{{ ad_linux_sudo_bin }} -V"
+  register: ad_linux_sudo_v
+  changed_when: false
+
+- name: Chercher le visudo classique (visudo.ws)
+  ansible.builtin.stat:
+    path: "{{ ad_linux_visudo_classic_bin }}"
+  register: ad_linux_visudo_ws
+
+- name: Identifier l'implémentation et la version de sudo
+  ansible.builtin.set_fact:
+    ad_linux_sudo_is_rs: "{{ 'sudo-rs' in (ad_linux_sudo_v.stdout | lower) }}"
+    ad_linux_sudo_version: >-
+      {{ ad_linux_sudo_v.stdout
+         | regex_search('Sudo version ([0-9]+(?:\.[0-9]+)*)', '\1')
+         | default(['0'], true) | first }}
+
+- name: En déduire les fonctions disponibles et le visudo à utiliser
+  ansible.builtin.set_fact:
+    # regex : sudo classique >= 1.9.10 seulement (RHEL 9 = 1.9.5 : non)
+    ad_linux_sudo_regex_ok: >-
+      {{ (not ad_linux_sudo_is_rs)
+         and (ad_linux_sudo_version is version(ad_linux_sudo_regex_min_version, '>=')) }}
+    # journalisation des entrées/sorties : sudo classique seulement
+    ad_linux_sudo_iolog_ok: "{{ not ad_linux_sudo_is_rs }}"
+    # visudo.ws seulement si le sudo actif est le classique : sinon on
+    # validerait une syntaxe que sudo-rs refuse.
+    ad_linux_visudo: >-
+      {{ ad_linux_visudo_classic_bin
+         if ((not ad_linux_sudo_is_rs) and ad_linux_visudo_ws.stat.exists)
+         else ad_linux_visudo_bin }}
+
+- name: Afficher le sudo détecté
+  ansible.builtin.debug:
+    msg: >-
+      sudo {{ 'sudo-rs' if ad_linux_sudo_is_rs else 'classique ' ~ ad_linux_sudo_version }} ;
+      regex={{ ad_linux_sudo_regex_ok }} ; journalisation E/S={{ ad_linux_sudo_iolog_ok }} ;
+      validation={{ ad_linux_visudo }}
+
+- name: Avertir si sudo-rs reste actif malgré ad_force_classic_sudo
+  ansible.builtin.debug:
+    msg: >-
+      ATTENTION : sudo-rs est actif et {{ ad_linux_sudo_classic_bin }} est introuvable.
+      Pas de regex ni de log_input/log_output. Installer le paquet du sudo classique.
+  when:
+    - ad_force_classic_sudo | bool
+    - ad_linux_sudo_is_rs

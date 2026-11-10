@@ -1,0 +1,20 @@
+---
+ad_linux_packages:
+  - realmd
+  - sssd
+  - sssd-tools
+  - libnss-sss
+  - libpam-sss
+  - adcli
+  - samba-common-bin
+  - oddjob
+  - oddjob-mkhomedir
+  - packagekit
+  - krb5-user
+
+ad_linux_pkg_cmd: /usr/bin/apt-get
+ad_linux_pkg_update_args: update
+# Nom de paquet Debian. Le premier caractère ne peut pas être « - » (donc
+# aucune option, ex. -o APT::...). Le dernier ne peut pas être « - » non plus :
+# « apt-get install paquet- » DÉSINSTALLE le paquet.
+ad_linux_pkg_name_regex: "[a-z0-9][a-z0-9.+-]*[a-z0-9+]"

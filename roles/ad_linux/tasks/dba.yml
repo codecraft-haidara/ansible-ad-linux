@@ -1,0 +1,101 @@
+---
+- name: Supprimer le sudoers DBA si les droits DBA sont désactivés
+  ansible.builtin.file:
+    path: /etc/sudoers.d/dba
+    state: absent
+  when: not (dba_enabled | bool)
+
+- name: Droits DBA
+  when: dba_enabled | bool
+  block:
+    - name: Vérifier les variables DBA
+      ansible.builtin.assert:
+        that:
+          - dba_group | length > 0
+          - dba_pkg_mode in ['auto', 'regex', 'list', 'none']
+          - dba_run_as_users | length > 0
+        fail_msg: >-
+          dba_group et dba_run_as_users doivent être renseignés, et dba_pkg_mode
+          vaut auto, regex, list ou none (reçu : « {{ dba_pkg_mode }} »).
+        quiet: true
+
+    - name: Déterminer le mode d'installation de paquets
+      ansible.builtin.set_fact:
+        ad_linux_dba_pkg_mode: >-
+          {{ dba_pkg_mode if dba_pkg_mode != 'auto'
+             else ('regex' if ad_linux_sudo_regex_ok
+                   else ('list' if (dba_pkg_whitelist | length > 0) else 'none')) }}
+
+    - name: Vérifier que le mode regex est possible avec ce sudo
+      ansible.builtin.assert:
+        that:
+          - ad_linux_sudo_regex_ok
+        fail_msg: >-
+          dba_pkg_mode=regex demande le sudo classique >= {{ ad_linux_sudo_regex_min_version }}
+          (ici : {{ 'sudo-rs' if ad_linux_sudo_is_rs else ad_linux_sudo_version }}).
+          Utiliser auto, list ou none.
+        quiet: true
+      when: ad_linux_dba_pkg_mode == 'regex'
+
+    # Garantit qu'aucun joker ni aucune option n'entre dans sudoers
+    - name: Vérifier la liste blanche de paquets
+      ansible.builtin.assert:
+        that:
+          - dba_pkg_whitelist | length > 0
+          - dba_pkg_whitelist | reject('match', '^' ~ ad_linux_pkg_name_regex ~ '$') | list | length == 0
+        fail_msg: >-
+          dba_pkg_whitelist est vide ou contient un nom de paquet invalide :
+          {{ dba_pkg_whitelist | reject('match', '^' ~ ad_linux_pkg_name_regex ~ '$') | list }}
+        quiet: true
+      when: ad_linux_dba_pkg_mode == 'list'
+
+    - name: Déployer le sudoers des DBA
+      ansible.builtin.template:
+        src: dba.sudoers.j2
+        dest: /etc/sudoers.d/dba
+        owner: root
+        group: root
+        mode: "0440"
+        validate: "{{ ad_linux_visudo }} -cf %s"
+
+    # apt-listchanges affiche les nouveautés dans less : « !sh » = shell root
+    - name: Chercher la configuration d'apt-listchanges
+      ansible.builtin.stat:
+        path: /etc/apt/listchanges.conf
+      register: ad_linux_listchanges
+      when: ad_linux_dba_pkg_mode != 'none'
+
+    - name: Désactiver le pager d'apt-listchanges
+      community.general.ini_file:
+        path: /etc/apt/listchanges.conf
+        section: apt
+        option: frontend
+        value: none
+        create: false
+        mode: "0644"
+      when:
+        - ad_linux_dba_pkg_mode != 'none'
+        - ad_linux_listchanges.stat.exists
+
+    - name: Chercher le compte propriétaire des sauvegardes
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ dba_backup_owner }}"
+        fail_key: false
+
+    - name: Créer le répertoire de sauvegarde
+      ansible.builtin.file:
+        path: "{{ dba_backup_dir }}"
+        state: directory
+        owner: "{{ dba_backup_owner }}"
+        group: "{{ ad_linux_dba_group_system }}"
+        mode: "2770"
+      when: ansible_facts['getent_passwd'][dba_backup_owner] is not none
+
+    - name: Signaler que le répertoire de sauvegarde n'est pas créé
+      ansible.builtin.debug:
+        msg: >-
+          Le compte « {{ dba_backup_owner }} » n'existe pas sur cet hôte :
+          {{ dba_backup_dir }} n'est pas créé. Relancer avec --tags dba une fois
+          le moteur installé.
+      when: ansible_facts['getent_passwd'][dba_backup_owner] is none

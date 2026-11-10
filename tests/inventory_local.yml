@@ -1,0 +1,16 @@
+---
+# Inventaire du test réel local (tests/test_local_sudo.sh) : groupes et
+# utilisateurs locaux, donc pas de suffixe @finance.mef.
+all:
+  children:
+    linux_ad:
+      hosts:
+        localhost:
+          ansible_connection: local
+      vars:
+        ad_use_fully_qualified_names: false
+        ad_admin_groups:
+          - admdisr
+        dba_enabled: true
+        dba_group: dba_caisff
+        dba_pkg_mode: auto

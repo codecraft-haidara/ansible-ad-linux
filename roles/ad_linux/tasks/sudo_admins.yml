@@ -1,0 +1,9 @@
+---
+- name: Déployer le sudoers des groupes administrateurs
+  ansible.builtin.template:
+    src: ad-groups.sudoers.j2
+    dest: /etc/sudoers.d/ad-groups
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "{{ ad_linux_visudo }} -cf %s"

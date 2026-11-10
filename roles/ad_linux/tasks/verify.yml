@@ -1,0 +1,47 @@
+---
+- name: Lire l'état de la jonction
+  ansible.builtin.command:
+    cmd: realm list
+  register: ad_linux_verify_realm
+  changed_when: false
+
+- name: Vérifier que le domaine est joint
+  ansible.builtin.assert:
+    that:
+      - ad_domain in ad_linux_verify_realm.stdout
+    fail_msg: "{{ ad_domain }} absent de « realm list »."
+    quiet: true
+
+- name: Valider l'ensemble de la configuration sudoers
+  ansible.builtin.command:
+    cmd: "{{ ad_linux_visudo }} -c"
+  register: ad_linux_verify_visudo
+  changed_when: false
+
+- name: Résoudre les utilisateurs de test
+  ansible.builtin.command:
+    argv:
+      - id
+      - "{{ item }}"
+  register: ad_linux_verify_id
+  changed_when: false
+  loop: "{{ ad_verify_users }}"
+
+- name: Lire les droits sudo des utilisateurs de test
+  ansible.builtin.command:
+    argv:
+      - "{{ ad_linux_sudo_bin }}"
+      - -l
+      - -U
+      - "{{ item }}"
+  register: ad_linux_verify_sudo
+  changed_when: false
+  loop: "{{ ad_verify_users }}"
+
+- name: Afficher le résultat des vérifications
+  ansible.builtin.debug:
+    msg:
+      realm: "{{ ad_linux_verify_realm.stdout_lines }}"
+      visudo: "{{ ad_linux_verify_visudo.stdout_lines }}"
+      id: "{{ ad_linux_verify_id.results | map(attribute='stdout') | list }}"
+      sudo: "{{ ad_linux_verify_sudo.results | map(attribute='stdout_lines') | list }}"

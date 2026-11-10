@@ -1,0 +1,60 @@
+---
+# ---------------------------------------------------------------- Domaine ---
+ad_domain: finance.mef
+
+# Compte de jonction et son mot de passe (à fournir par ansible-vault)
+ad_join_user: ""
+ad_join_password: "{{ vault_ad_join_password | default('') }}"
+
+# OU des objets ordinateur, ex. "OU=Serveurs Linux,DC=finance,DC=mef" (vide = défaut AD)
+ad_computer_ou: ""
+
+# Refuser de continuer si l'horloge n'est pas synchronisée par NTP
+ad_require_ntp_sync: true
+
+# ------------------------------------------------------------------- SSSD ---
+# True : connexion sous la forme utilisateur@finance.mef, et les groupes
+# portent le suffixe @finance.mef dans sudoers.
+ad_use_fully_qualified_names: true
+
+# Groupes AD administrateurs : connexion + « ALL=(ALL:ALL) ALL »
+ad_admin_groups: []
+
+# Groupes AD supplémentaires autorisés à se connecter (sans sudo), par hôte
+ad_host_login_groups: []
+
+# ------------------------------------------------------------------- sudo ---
+# Ubuntu 25.10+ : basculer /usr/bin/sudo de sudo-rs vers le sudo classique
+ad_force_classic_sudo: true
+
+# ---------------------------------------------------------------- Contrôle ---
+# Comptes pour lesquels afficher « id » et « sudo -l -U » en fin de passage
+ad_verify_users: []
+
+# -------------------------------------------------------------------- DBA ---
+dba_enabled: false
+dba_group: ""
+
+# Commandes de service exactes (chemin absolu, aucun joker).
+# Ne PAS y mettre « systemctl status » : son pager (less) donne un shell root.
+dba_service_commands:
+  - /usr/bin/systemctl restart postgresql
+  - /usr/bin/systemctl reload postgresql
+
+# Comptes moteurs que les DBA peuvent endosser : ALL=(<comptes>) ALL
+dba_run_as_users:
+  - postgres
+
+# Installation de paquets : auto | regex | list | none
+#   auto  : regex si le sudo le permet, sinon list si la liste blanche
+#           n'est pas vide, sinon none
+dba_pkg_mode: auto
+# Liste blanche du mode « list » (noms de paquets exacts)
+dba_pkg_whitelist: []
+
+# Journaliser les sessions sudo des DBA (log_input, log_output) si possible
+dba_io_logging: true
+
+# Répertoire de sauvegarde (créé seulement si le compte propriétaire existe)
+dba_backup_dir: /var/backups/postgresql
+dba_backup_owner: postgres

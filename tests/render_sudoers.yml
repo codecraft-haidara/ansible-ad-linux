@@ -1,0 +1,78 @@
+---
+# Rend les deux templates sudoers dans toutes les combinaisons et valide chaque
+# rendu avec visudo -cf. Ne touche pas au système (sortie dans tests/rendered/).
+#   ansible-playbook tests/render_sudoers.yml
+- name: Rendre et valider les templates sudoers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars_files:
+    - ../roles/ad_linux/defaults/main.yml
+    - ../roles/ad_linux/vars/main.yml
+  vars:
+    render_dir: "{{ playbook_dir }}/rendered"
+    render_templates: "{{ playbook_dir }}/../roles/ad_linux/templates"
+    render_visudo: /usr/sbin/visudo
+  tasks:
+    # set_fact : les valeurs de defaults/ chargées par vars_files priment sur
+    # les « vars » du play.
+    - name: Définir les valeurs de test
+      ansible.builtin.set_fact:
+        # Majuscules et espaces exprès : le rendu doit donner des minuscules et « \ »
+        ad_admin_groups:
+          - admdisr
+          - Admins Serveurs Linux
+        dba_group: DBA_CAISFF
+        dba_run_as_users:
+          - postgres
+          - oracle
+        dba_pkg_whitelist:
+          - htop
+          - postgresql-client
+        ad_linux_sudo_iolog_ok: true
+
+    - name: Charger les variables Debian
+      ansible.builtin.include_vars:
+        file: ../roles/ad_linux/vars/Debian.yml
+        name: render_os_debian
+
+    - name: Charger les variables RedHat
+      ansible.builtin.include_vars:
+        file: ../roles/ad_linux/vars/RedHat.yml
+        name: render_os_redhat
+
+    - name: Créer le répertoire de sortie
+      ansible.builtin.file:
+        path: "{{ render_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Rendre et valider le sudoers des admins (fqdn True et False)
+      ansible.builtin.template:
+        src: "{{ render_templates }}/ad-groups.sudoers.j2"
+        dest: "{{ render_dir }}/ad-groups_fqdn-{{ item }}"
+        mode: "0440"
+        validate: "{{ render_visudo }} -cf %s"
+      vars:
+        ad_use_fully_qualified_names: "{{ item }}"
+      loop:
+        - true
+        - false
+
+    - name: Rendre et valider le sudoers des DBA (OS x fqdn x mode)
+      ansible.builtin.template:
+        src: "{{ render_templates }}/dba.sudoers.j2"
+        dest: "{{ render_dir }}/dba_{{ item.0 }}_fqdn-{{ item.1 }}_{{ item.2 }}"
+        mode: "0440"
+        validate: "{{ render_visudo }} -cf %s"
+      vars:
+        render_os: "{{ render_os_debian if item.0 == 'Debian' else render_os_redhat }}"
+        ad_use_fully_qualified_names: "{{ item.1 }}"
+        ad_linux_dba_pkg_mode: "{{ item.2 }}"
+        ad_linux_pkg_cmd: "{{ render_os.ad_linux_pkg_cmd }}"
+        ad_linux_pkg_update_args: "{{ render_os.ad_linux_pkg_update_args }}"
+        ad_linux_pkg_name_regex: "{{ render_os.ad_linux_pkg_name_regex }}"
+      loop: "{{ ['Debian', 'RedHat'] | product([true, false], ['regex', 'list', 'none']) | list }}"
+      loop_control:
+        label: "{{ item.0 }} fqdn={{ item.1 }} mode={{ item.2 }}"

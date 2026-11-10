@@ -1,0 +1,36 @@
+---
+- name: Refuser de continuer sans groupe autorisé
+  ansible.builtin.assert:
+    that:
+      - ad_linux_login_groups | length > 0
+    fail_msg: >-
+      Aucun groupe autorisé à se connecter (ad_admin_groups, dba_group,
+      ad_host_login_groups). Avec access_provider = simple, plus personne
+      du domaine ne pourrait ouvrir de session.
+    quiet: true
+
+# Équivalent idempotent de « realm deny --all » + « realm permit -g <groupes> »
+- name: Configurer le contrôle d'accès dans sssd.conf
+  community.general.ini_file:
+    path: /etc/sssd/sssd.conf
+    section: "domain/{{ ad_domain }}"
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    create: false
+    owner: root
+    group: root
+    mode: "0600"
+  loop:
+    - option: access_provider
+      value: simple
+    - option: simple_allow_groups
+      value: "{{ ad_linux_login_groups | join(', ') }}"
+    - option: use_fully_qualified_names
+      value: "{{ ad_use_fully_qualified_names | bool | string }}"
+  loop_control:
+    label: "{{ item.option }}"
+  notify: ad_linux sssd modifié
+
+# Le groupe AD doit être résolu avant de créer le répertoire de sauvegarde
+- name: Appliquer tout de suite les changements SSSD
+  ansible.builtin.meta: flush_handlers

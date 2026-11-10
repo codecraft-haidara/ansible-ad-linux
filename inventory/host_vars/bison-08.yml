@@ -1,0 +1,11 @@
+---
+# Groupes AD supplémentaires autorisés à se connecter sur CE serveur
+# (connexion seulement, sans sudo). Exemple :
+# ad_host_login_groups:
+#   - nom_du_groupe_ad
+ad_host_login_groups: []
+
+# Comptes contrôlés à la fin du passage (id + sudo -l -U)
+ad_verify_users:
+  - m.sylla@finance.mef
+  - mo.coulibaly@finance.mef

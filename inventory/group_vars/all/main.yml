@@ -1,0 +1,22 @@
+---
+# Domaine Active Directory
+ad_domain: finance.mef
+
+# Compte utilisé pour la jonction (droit de créer des objets ordinateur)
+ad_join_user: al.haidara
+# Le mot de passe vient du vault (voir vault.yml.example)
+ad_join_password: "{{ vault_ad_join_password }}"
+
+# OU de destination des objets ordinateur (vide = conteneur par défaut)
+# ad_computer_ou: "OU=Serveurs Linux,DC=finance,DC=mef"
+ad_computer_ou: ""
+
+# Les utilisateurs se connectent sous la forme utilisateur@finance.mef
+ad_use_fully_qualified_names: true
+
+# Groupes AD administrateurs : connexion + sudo complet
+ad_admin_groups:
+  - admdisr
+
+# Groupe AD des DBA (droits appliqués seulement si dba_enabled: true)
+dba_group: dba_caisff

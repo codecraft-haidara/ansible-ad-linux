@@ -1,0 +1,13 @@
+---
+# Les handlers s'exécutent dans l'ordre de ce fichier : cache, puis redémarrage.
+- name: Vider le cache SSSD
+  ansible.builtin.command:
+    cmd: sss_cache -E
+  changed_when: true
+  listen: ad_linux sssd modifié
+
+- name: Redémarrer sssd
+  ansible.builtin.service:
+    name: sssd
+    state: restarted
+  listen: ad_linux sssd modifié

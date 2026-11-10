@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Groupes AD administrateurs. Noms en minuscules (SSSD), espaces échappés.
+{% for g in ad_admin_groups %}
+%{{ g | lower | replace(' ', '\\ ') }}{{ ad_linux_group_suffix }} ALL=(ALL:ALL) ALL
+{% endfor %}

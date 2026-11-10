@@ -1,0 +1,55 @@
+---
+- name: Charger les variables propres à la famille d'OS
+  ansible.builtin.include_vars:
+    file: "{{ ansible_facts['os_family'] }}.yml"
+  when: ansible_facts['os_family'] in ['Debian', 'RedHat']
+  tags:
+    - always
+
+- name: Prérequis
+  ansible.builtin.import_tasks: preflight.yml
+  tags:
+    - preflight
+
+- name: Paquets
+  ansible.builtin.import_tasks: packages.yml
+  tags:
+    - packages
+
+- name: Jonction au domaine
+  ansible.builtin.import_tasks: join.yml
+  tags:
+    - join
+
+- name: Contrôle d'accès SSSD
+  ansible.builtin.import_tasks: sssd.yml
+  tags:
+    - sssd
+    - access
+
+- name: Création automatique des répertoires personnels
+  ansible.builtin.import_tasks: mkhomedir.yml
+  tags:
+    - mkhomedir
+
+- name: Détection de l'implémentation de sudo
+  ansible.builtin.import_tasks: sudo_detect.yml
+  tags:
+    - sudo
+    - dba
+    - verify
+
+- name: Sudoers des administrateurs
+  ansible.builtin.import_tasks: sudo_admins.yml
+  tags:
+    - sudo
+
+- name: Droits des DBA
+  ansible.builtin.import_tasks: dba.yml
+  tags:
+    - dba
+
+- name: Vérification
+  ansible.builtin.import_tasks: verify.yml
+  tags:
+    - verify

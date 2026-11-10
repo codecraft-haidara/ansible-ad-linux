@@ -1,0 +1,42 @@
+---
+- name: Vérifier que l'OS est pris en charge
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] in ['Debian', 'RedHat']
+    fail_msg: >-
+      OS non pris en charge : {{ ansible_facts['distribution'] }}
+      (famille {{ ansible_facts['os_family'] }}). Attendu : Debian, Ubuntu ou Red Hat.
+    quiet: true
+
+- name: Vérifier la longueur du nom court (limite NetBIOS de 15 caractères)
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['hostname'] | length <= 15
+    fail_msg: >-
+      Le nom court « {{ ansible_facts['hostname'] }} » fait
+      {{ ansible_facts['hostname'] | length }} caractères (15 au plus).
+    quiet: true
+
+- name: Lire l'état de la synchronisation NTP
+  ansible.builtin.command:
+    cmd: timedatectl show --property=NTPSynchronized --value
+  register: ad_linux_ntp
+  changed_when: false
+  when: ad_require_ntp_sync | bool
+
+- name: Vérifier que l'horloge est synchronisée (Kerberos tolère 5 minutes d'écart)
+  ansible.builtin.assert:
+    that:
+      - ad_linux_ntp.stdout | trim == 'yes'
+    fail_msg: >-
+      Horloge non synchronisée par NTP (NTPSynchronized={{ ad_linux_ntp.stdout | trim }}).
+      Corriger chrony/systemd-timesyncd avant la jonction.
+    quiet: true
+  when: ad_require_ntp_sync | bool
+
+- name: Avertir si le FQDN n'est pas dans le domaine
+  ansible.builtin.debug:
+    msg: >-
+      ATTENTION : le FQDN « {{ ansible_facts['fqdn'] }} » ne se termine pas par
+      .{{ ad_domain }}. Vérifier /etc/hosts et hostnamectl (enregistrement DNS et SPN).
+  when: not (ansible_facts['fqdn'] | lower).endswith('.' ~ (ad_domain | lower))

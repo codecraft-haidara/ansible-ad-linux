@@ -1,0 +1,41 @@
+---
+- name: Debian - vérifier si pam_mkhomedir est déjà actif
+  ansible.builtin.command:
+    cmd: grep -qs pam_mkhomedir /etc/pam.d/common-session
+  register: ad_linux_mkhomedir_pam
+  changed_when: false
+  failed_when: ad_linux_mkhomedir_pam.rc not in [0, 1, 2]
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Debian - activer mkhomedir
+  ansible.builtin.command:
+    cmd: pam-auth-update --enable mkhomedir
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  changed_when: true
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - ad_linux_mkhomedir_pam.rc != 0
+
+- name: Red Hat - lire le profil authselect
+  ansible.builtin.command:
+    cmd: authselect current
+  register: ad_linux_authselect
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Red Hat - activer with-mkhomedir
+  ansible.builtin.command:
+    cmd: authselect enable-feature with-mkhomedir
+  changed_when: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - "'with-mkhomedir' not in ad_linux_authselect.stdout"
+
+- name: Red Hat - activer et démarrer oddjobd
+  ansible.builtin.service:
+    name: oddjobd
+    state: started
+    enabled: true
+  when: ansible_facts['os_family'] == 'RedHat'
