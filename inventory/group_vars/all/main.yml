@@ -11,8 +11,9 @@ ad_join_password: "{{ vault_ad_join_password }}"
 # ad_computer_ou: "OU=Serveurs Linux,DC=finance,DC=mef"
 ad_computer_ou: ""
 
-# Les utilisateurs se connectent sous la forme utilisateur@finance.mef
-ad_use_fully_qualified_names: true
+# false : connexion avec le nom court (prenom.nom), groupes sans suffixe.
+# true  : connexion sous la forme prenom.nom@finance.mef.
+ad_use_fully_qualified_names: false
 
 # Groupes AD administrateurs : connexion + sudo complet
 ad_admin_groups:
@@ -34,7 +35,7 @@ radius_timeout: 5
 radius_bypass_users:
   - caisff
   # Compte AD à exempter aussi (nom tel que renvoyé par « id », en minuscules) :
-  # - administrator@finance.mef
+  # - administrator
 # Compte local de secours (sudo, exempté de RADIUS), créé par le rôle.
 # Son mot de passe initial vient du vault (vault_emergency_password).
 radius_emergency_user: emergency_account
