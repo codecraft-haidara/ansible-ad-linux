@@ -22,3 +22,21 @@ ad_admin_groups:
 # par défaut dans le rôle). Pour les activer plus tard sur un groupe d'hôtes :
 #   dba_enabled: true
 #   dba_group: dba_caisff
+
+# Second facteur SSH par RADIUS (FortiAuthenticator)
+radius_enabled: true
+radius_server: 192.168.52.10
+radius_port: 1812
+radius_timeout: 5
+# Le secret partagé vient du vault (vault_radius_secret)
+# Comptes locaux qui se connectent SANS RADIUS : compte de secours, et compte
+# utilisé par Ansible s'il se connecte par mot de passe.
+radius_bypass_users:
+  - caisff
+  # Compte AD à exempter aussi (nom tel que renvoyé par « id », en minuscules) :
+  # - administrator@finance.mef
+# Compte local de secours (sudo, exempté de RADIUS), créé par le rôle.
+# Son mot de passe initial vient du vault (vault_emergency_password).
+radius_emergency_user: emergency_account
+# Serveur à plusieurs interfaces : fixer l'adresse source dans host_vars/<hôte>.yml
+#   radius_source_ip: 192.168.50.20

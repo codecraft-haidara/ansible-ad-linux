@@ -42,6 +42,14 @@ et y mettre (modèle : `inventory/group_vars/all/vault.yml.example`) :
 
 ```yaml
 vault_ad_join_password: "le mot de passe du compte de jonction"
+vault_radius_secret: "le secret partagé RADIUS"
+vault_emergency_password: "le mot de passe initial du compte de secours"
+```
+
+Pour compléter un vault existant :
+
+```bash
+ansible-vault edit inventory/group_vars/all/vault.yml
 ```
 
 ## Lancement
@@ -110,6 +118,40 @@ Les noms de groupes sont écrits **en minuscules** dans sudoers et sssd, quelle 
 la casse donnée : SSSD renvoie les noms AD en minuscules et sudo respecte la casse. Les
 espaces sont échappés (`\ `) dans sudoers.
 
+### Second facteur SSH par RADIUS (FortiAuthenticator)
+
+| Variable | Défaut | Description |
+|---|---|---|
+| `radius_enabled` | `false` | Activer le second facteur RADIUS pour SSH (Debian/Ubuntu seulement) |
+| `radius_server` | `""` | Adresse du FortiAuthenticator |
+| `radius_port` | `1812` | Port RADIUS |
+| `radius_secret` | `vault_radius_secret` | Secret partagé, fourni par le vault |
+| `radius_timeout` | `5` | Délai de réponse en secondes |
+| `radius_source_ip` | `""` | Adresse source des requêtes, pour un serveur à plusieurs interfaces |
+| `radius_bypass_group` | `noradius` | Groupe local dont les membres se connectent sans RADIUS |
+| `radius_bypass_users` | `[]` | Comptes à mettre dans ce groupe (locaux, ou AD en minuscules) |
+| `radius_emergency_user` | `emergency_account` | Compte local de secours (sudo, exempté) ; vide = ne pas le créer |
+| `radius_emergency_password` | `vault_emergency_password` | Mot de passe initial du compte de secours, posé à la création seulement |
+
+Déroulement d'une connexion SSH : mot de passe (local ou AD), puis RADIUS. Les membres de
+`noradius` s'arrêtent au mot de passe. Si le FortiAuthenticator ne répond pas, tous les
+autres comptes sont **refusés** : c'est le rôle du compte de secours.
+
+Avant d'activer RADIUS sur un serveur :
+
+- le déclarer comme client RADIUS sur le FortiAuthenticator, avec le même secret ;
+- vérifier qu'il joint le FortiAuthenticator en UDP 1812 ;
+- mettre dans `radius_bypass_users` le compte utilisé par Ansible s'il se connecte par
+  mot de passe (une connexion par clé SSH ne passe pas par RADIUS).
+
+Un serveur où RADIUS a déjà été configuré à la main (ligne `pam_radius_auth.so` active
+dans `/etc/pam.d/sshd`, sans le repère du rôle) n'est pas modifié : le rôle y assure
+seulement le groupe `noradius` et le compte de secours.
+
+Le rôle ne remplace pas `sshd_config` : il y ajoute en tête `UsePAM`,
+`KbdInteractiveAuthentication` et `ChallengeResponseAuthentication` à `yes`. Il ne touche
+ni à `PermitRootLogin` ni à `PasswordAuthentication`.
+
 ### Installation de paquets par les DBA (`dba_pkg_mode`)
 
 | Mode | Effet |
@@ -137,6 +179,7 @@ paquet-` désinstalle le paquet). Aucun joker `*` n'est jamais écrit dans les a
 | `mkhomedir` | `pam-auth-update --enable mkhomedir` (Debian) ; `authselect` + oddjobd (RHEL) |
 | `sudo` | Bascule vers le sudo classique, `/etc/sudoers.d/ad-groups` |
 | `dba` | `/etc/sudoers.d/dba`, apt-listchanges, répertoire de sauvegarde |
+| `radius` | Compte de secours, groupe `noradius`, module PAM RADIUS, second facteur dans la pile PAM de sshd |
 | `verify` | `realm list`, `visudo -c`, `id` et `sudo -l -U` des comptes de test |
 
 ## Dépannage
@@ -177,6 +220,20 @@ sudo -V | head -1
 « Sudo version 1.9.x » : sudo classique. « sudo-rs x.y » : sudo-rs. Si sudo-rs reste actif
 (`ad_force_classic_sudo: false` ou `sudo.ws` absent), le rôle n'écrit ni regex ni
 journalisation, et le mode `regex` demandé explicitement est refusé.
+
+### « Timeout (12s) waiting for privilege escalation prompt »
+
+sudo a mis trop de temps à répondre, souvent juste après la jonction, quand SSSD démarre.
+`ansible.cfg` porte le délai à 60 secondes ; relancer simplement le playbook, il reprend
+là où il s'est arrêté. Si Ansible ignore `ansible.cfg` (dépôt sous `/mnt/c` dans WSL),
+faire `export ANSIBLE_CONFIG="$PWD/ansible.cfg"` ou cloner le dépôt dans `~`.
+
+### Connexion SSH refusée après l'activation de RADIUS
+
+- le compte n'est pas connu du FortiAuthenticator, ou le serveur n'y est pas déclaré
+  comme client RADIUS ;
+- le FortiAuthenticator est injoignable : se connecter avec le compte de secours ;
+- serveur à plusieurs interfaces : fixer `radius_source_ip` dans `host_vars/<hôte>.yml`.
 
 ### Un utilisateur AD ne peut pas se connecter
 

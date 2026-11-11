@@ -58,3 +58,29 @@ dba_io_logging: true
 # Répertoire de sauvegarde (créé seulement si le compte propriétaire existe)
 dba_backup_dir: /var/backups/postgresql
 dba_backup_owner: postgres
+
+# ----------------------------------------------------------------- RADIUS ---
+# Second facteur SSH par RADIUS (FortiAuthenticator) via pam_radius_auth.
+# Debian/Ubuntu seulement. Un serveur déjà configuré à la main n'est pas touché.
+radius_enabled: false
+radius_server: ""
+radius_port: 1812
+# Secret partagé : à fournir par ansible-vault (vault_radius_secret)
+radius_secret: "{{ vault_radius_secret | default('') }}"
+# Délai de réponse en secondes (3 à 60)
+radius_timeout: 5
+# Adresse source des requêtes RADIUS (serveurs à plusieurs interfaces). Vide = automatique.
+radius_source_ip: ""
+# Les membres de ce groupe local se connectent sans RADIUS (comptes de secours)
+radius_bypass_group: noradius
+# Comptes à mettre dans ce groupe : comptes locaux, ou comptes AD écrits comme
+# SSSD les renvoie (minuscules, ex. prenom.nom@finance.mef). Le compte de
+# secours ci-dessous y est ajouté d'office.
+radius_bypass_users: []
+
+# Compte local de secours : créé avec un shell bash, membre du groupe
+# d'administration local (sudo) et du groupe exempté. Vide = ne pas le créer.
+radius_emergency_user: emergency_account
+# Mot de passe initial, par ansible-vault. Posé à la création seulement, jamais
+# modifié ensuite. Vide = compte créé verrouillé (faire « passwd » à la main).
+radius_emergency_password: "{{ vault_emergency_password | default('') }}"

@@ -3,3 +3,7 @@
 #   ansible-vault create inventory/group_vars/all/vault.yml
 # et y mettre le mot de passe du compte de jonction (ad_join_user).
 vault_ad_join_password: "CHANGER_MOI"
+# Secret partagé RADIUS (le même que celui déclaré sur le FortiAuthenticator)
+vault_radius_secret: "CHANGER_MOI"
+# Mot de passe initial du compte local de secours (emergency_account)
+vault_emergency_password: "CHANGER_MOI"

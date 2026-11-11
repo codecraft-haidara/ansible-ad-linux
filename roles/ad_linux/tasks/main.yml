@@ -32,6 +32,11 @@
   tags:
     - mkhomedir
 
+- name: Second facteur SSH par RADIUS
+  ansible.builtin.import_tasks: radius.yml
+  tags:
+    - radius
+
 - name: Détection de l'implémentation de sudo
   ansible.builtin.import_tasks: sudo_detect.yml
   tags:

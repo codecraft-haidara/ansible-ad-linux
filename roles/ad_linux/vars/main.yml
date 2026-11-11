@@ -15,6 +15,13 @@ ad_linux_login_groups: >-
 # Groupe DBA tel que vu par le système (pour chown/chgrp)
 ad_linux_dba_group_system: "{{ dba_group | lower }}{{ ad_linux_group_suffix }}"
 
+# Repère du bloc RADIUS dans /etc/pam.d/sshd et sshd_config
+ad_linux_radius_marker: "ANSIBLE MANAGED BLOCK ad_linux radius"
+
+# Membres du groupe exempté : comptes déclarés + compte de secours
+ad_linux_radius_bypass_members: >-
+  {{ (radius_bypass_users + [radius_emergency_user]) | select | unique | list }}
+
 ad_linux_sudo_bin: /usr/bin/sudo
 ad_linux_sudo_classic_bin: /usr/bin/sudo.ws
 ad_linux_visudo_bin: /usr/sbin/visudo
