@@ -9,6 +9,21 @@
       du domaine ne pourrait ouvrir de session.
     quiet: true
 
+- name: Chercher sssd.conf
+  ansible.builtin.stat:
+    path: /etc/sssd/sssd.conf
+  register: ad_linux_sssd_conf
+
+- name: Vérifier que le domaine est déjà joint
+  ansible.builtin.assert:
+    that:
+      - ad_linux_sssd_conf.stat.exists
+    fail_msg: >-
+      /etc/sssd/sssd.conf n'existe pas : ce serveur n'est pas encore joint au
+      domaine. Lancer le playbook sans --tags (ou avec --tags packages,join
+      en plus) sur cet hôte.
+    quiet: true
+
 # Équivalent idempotent de « realm deny --all » + « realm permit -g <groupes> »
 - name: Configurer le contrôle d'accès dans sssd.conf
   community.general.ini_file:
