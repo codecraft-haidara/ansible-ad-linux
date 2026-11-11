@@ -60,20 +60,23 @@ Puis le reste du parc :
 ansible-playbook playbooks/ad_linux.yml --ask-become-pass --ask-vault-pass
 ```
 
-Relancer une seule partie, par exemple les droits DBA :
+Relancer une seule partie, par exemple le contrôle d'accès SSSD :
 
 ```bash
-ansible-playbook playbooks/ad_linux.yml --limit bison-08 --tags dba --ask-become-pass
+ansible-playbook playbooks/ad_linux.yml --limit bison-08 --tags sssd --ask-become-pass
 ```
+
+Les droits DBA / PostgreSQL sont **désactivés** dans l'inventaire fourni
+(`dba_enabled: false` par défaut). Le rôle les gère toujours : pour les activer plus
+tard, définir `dba_enabled: true` et `dba_group` pour les hôtes concernés.
 
 ## Inventaire
 
 | Fichier | Rôle |
 |---|---|
-| `inventory/hosts.yml` | groupes `linux_ad` (tous les serveurs) et `db_postgresql` |
-| `inventory/group_vars/all/main.yml` | domaine, compte de jonction, groupes admins et DBA |
+| `inventory/hosts.yml` | groupe `linux_ad` (tous les serveurs) |
+| `inventory/group_vars/all/main.yml` | domaine, compte de jonction, groupes admins |
 | `inventory/group_vars/all/vault.yml` | mot de passe de jonction, chiffré |
-| `inventory/group_vars/db_postgresql.yml` | `dba_enabled: true` |
 | `inventory/host_vars/<hôte>.yml` | groupes de connexion et comptes de test propres à un hôte |
 
 ## Variables

@@ -1,9 +1,0 @@
----
-dba_enabled: true
-# Comptes moteurs que les DBA peuvent endosser (sudo -iu postgres)
-dba_run_as_users:
-  - postgres
-# auto : regex si le sudo de la machine le permet, sinon liste blanche, sinon rien
-dba_pkg_mode: auto
-# Utilisée en mode « list » (ou en repli du mode auto, ex. RHEL 9)
-dba_pkg_whitelist: []

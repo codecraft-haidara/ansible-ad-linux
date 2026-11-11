@@ -18,5 +18,7 @@ ad_use_fully_qualified_names: true
 ad_admin_groups:
   - admdisr
 
-# Groupe AD des DBA (droits appliqués seulement si dba_enabled: true)
-dba_group: dba_caisff
+# Droits DBA / PostgreSQL : désactivés pour l'instant (dba_enabled vaut false
+# par défaut dans le rôle). Pour les activer plus tard sur un groupe d'hôtes :
+#   dba_enabled: true
+#   dba_group: dba_caisff
