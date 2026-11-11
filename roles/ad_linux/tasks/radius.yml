@@ -1,0 +1,143 @@
+---
+- name: Signaler que RADIUS n'est géré que sur Debian/Ubuntu
+  ansible.builtin.debug:
+    msg: >-
+      RADIUS n'est pas configuré par ce rôle sur la famille
+      {{ ansible_facts['os_family'] }} (la pile PAM y est différente).
+  when:
+    - radius_enabled | bool
+    - ansible_facts['os_family'] != 'Debian'
+
+- name: Second facteur SSH par RADIUS
+  when:
+    - radius_enabled | bool
+    - ansible_facts['os_family'] == 'Debian'
+  block:
+    - name: Vérifier les variables RADIUS
+      ansible.builtin.assert:
+        that:
+          - radius_server | length > 0
+          - radius_secret | length > 0
+          - radius_timeout | int >= 3
+          - radius_timeout | int <= 60
+        fail_msg: >-
+          radius_server et radius_secret (vault_radius_secret) doivent être
+          renseignés, et radius_timeout vaut entre 3 et 60.
+        quiet: true
+
+    - name: Installer le module PAM RADIUS
+      ansible.builtin.apt:
+        name: "{{ ad_linux_radius_package }}"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    # Comptes de secours et groupe exempté AVANT d'activer RADIUS dans PAM,
+    # pour ne jamais couper leur accès.
+    - name: Créer le groupe exempté de RADIUS
+      ansible.builtin.group:
+        name: "{{ radius_bypass_group }}"
+        state: present
+
+    - name: Créer le compte local de secours
+      ansible.builtin.user:
+        name: "{{ radius_emergency_user }}"
+        shell: /bin/bash
+        create_home: true
+        groups:
+          - "{{ ad_linux_local_admin_group }}"
+          - "{{ radius_bypass_group }}"
+        append: true
+        password: "{{ (radius_emergency_password | password_hash('sha512')) if (radius_emergency_password | length > 0) else '!' }}"
+        update_password: on_create
+      no_log: true
+      when: radius_emergency_user | length > 0
+
+    - name: Signaler que le compte de secours n'a pas de mot de passe défini par le rôle
+      ansible.builtin.debug:
+        msg: >-
+          vault_emergency_password est vide : si {{ radius_emergency_user }} vient
+          d'être créé, il est verrouillé. Lui donner un mot de passe avec
+          « passwd {{ radius_emergency_user }} ».
+      when:
+        - radius_emergency_user | length > 0
+        - radius_emergency_password | length == 0
+
+    - name: Lire les membres du groupe exempté
+      ansible.builtin.getent:
+        database: group
+        key: "{{ radius_bypass_group }}"
+
+    # gpasswd et non usermod : fonctionne aussi pour un compte AD (résolu par SSSD)
+    - name: Ajouter les comptes exemptés de RADIUS
+      ansible.builtin.command:
+        argv:
+          - gpasswd
+          - -a
+          - "{{ item }}"
+          - "{{ radius_bypass_group }}"
+      changed_when: true
+      loop: "{{ ad_linux_radius_bypass_members }}"
+      when: item not in (ansible_facts['getent_group'][radius_bypass_group][2] | default('', true)).split(',')
+
+    - name: Lire la configuration PAM de sshd
+      ansible.builtin.slurp:
+        src: /etc/pam.d/sshd
+      register: ad_linux_pam_sshd
+
+    # RADIUS actif dans PAM sans le repère du rôle : configuré à la main.
+    # On n'y touche pas (sinon RADIUS serait demandé deux fois).
+    - name: Détecter une configuration RADIUS faite à la main
+      ansible.builtin.set_fact:
+        ad_linux_radius_manual: >-
+          {{ ((ad_linux_pam_sshd.content | b64decode) is search('(?m)^\s*auth\s.*pam_radius_auth\.so'))
+             and (ad_linux_radius_marker not in (ad_linux_pam_sshd.content | b64decode)) }}
+
+    - name: Signaler que RADIUS est déjà configuré à la main
+      ansible.builtin.debug:
+        msg: >-
+          pam_radius_auth est déjà actif dans /etc/pam.d/sshd (configuration
+          manuelle) : le rôle ne modifie ni PAM, ni sshd_config, ni
+          {{ ad_linux_radius_conf }} sur cet hôte. Seuls le groupe
+          {{ radius_bypass_group }} et le compte de secours sont assurés.
+      when: ad_linux_radius_manual
+
+    - name: Configurer RADIUS
+      when: not ad_linux_radius_manual
+      block:
+        - name: Déployer la configuration du client RADIUS
+          ansible.builtin.template:
+            src: pam_radius_auth.conf.j2
+            dest: "{{ ad_linux_radius_conf }}"
+            owner: root
+            group: root
+            mode: "0600"
+          no_log: true
+
+        # Placé en tête de fichier : dans sshd_config, la première valeur lue gagne.
+        - name: Autoriser l'authentification interactive (question du second facteur)
+          ansible.builtin.blockinfile:
+            path: /etc/ssh/sshd_config
+            marker: "# {mark} {{ ad_linux_radius_marker }}"
+            insertbefore: BOF
+            block: |
+              UsePAM yes
+              KbdInteractiveAuthentication yes
+              ChallengeResponseAuthentication yes
+            validate: /usr/sbin/sshd -t -f %s
+          notify: ad_linux ssh modifié
+
+        # Après le mot de passe (common-auth, en tête de fichier) : RADIUS,
+        # sauf pour les membres du groupe exempté.
+        - name: Activer RADIUS dans la pile PAM de sshd
+          ansible.builtin.blockinfile:
+            path: /etc/pam.d/sshd
+            marker: "# {mark} {{ ad_linux_radius_marker }}"
+            insertafter: EOF
+            block: |
+              # Pas de RADIUS pour les membres du groupe {{ radius_bypass_group }}
+              auth [success=1 default=ignore] pam_succeed_if.so quiet user ingroup {{ radius_bypass_group }}
+              auth [success=done default=die] pam_radius_auth.so
+
+        - name: Appliquer tout de suite la configuration SSH
+          ansible.builtin.meta: flush_handlers

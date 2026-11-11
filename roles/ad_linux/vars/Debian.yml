@@ -18,3 +18,9 @@ ad_linux_pkg_update_args: update
 # aucune option, ex. -o APT::...). Le dernier ne peut pas être « - » non plus :
 # « apt-get install paquet- » DÉSINSTALLE le paquet.
 ad_linux_pkg_name_regex: "[a-z0-9][a-z0-9.+-]*[a-z0-9+]"
+
+ad_linux_radius_package: libpam-radius-auth
+ad_linux_radius_conf: /etc/pam_radius_auth.conf
+ad_linux_ssh_service: ssh
+# Groupe local donnant sudo complet
+ad_linux_local_admin_group: sudo

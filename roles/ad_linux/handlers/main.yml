@@ -11,3 +11,9 @@
     name: sssd
     state: restarted
   listen: ad_linux sssd modifié
+
+- name: Recharger le service SSH
+  ansible.builtin.service:
+    name: "{{ ad_linux_ssh_service }}"
+    state: reloaded
+  listen: ad_linux ssh modifié

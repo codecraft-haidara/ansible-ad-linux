@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+# Client RADIUS de pam_radius_auth. Lisible par root seulement (secret partagé).
+# serveur[:port]  secret  délai (s)  [adresse source]
+{{ radius_server }}:{{ radius_port }} {{ radius_secret }} {{ radius_timeout }}{{ (' ' ~ radius_source_ip) if radius_source_ip else '' }}
