@@ -5,6 +5,8 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+    # Une mise à jour automatique (unattended-upgrades) peut tenir le verrou dpkg
+    lock_timeout: 600
   when: ansible_facts['os_family'] == 'Debian'
 
 - name: Installer les paquets (Red Hat)

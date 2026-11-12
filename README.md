@@ -228,6 +228,14 @@ sudo a mis trop de temps à répondre, souvent juste après la jonction, quand S
 là où il s'est arrêté. Si Ansible ignore `ansible.cfg` (dépôt sous `/mnt/c` dans WSL),
 faire `export ANSIBLE_CONFIG="$PWD/ansible.cfg"` ou cloner le dépôt dans `~`.
 
+### « Unable to acquire the dpkg frontend lock »
+
+Un autre `apt-get` tourne sur le serveur, en général une mise à jour automatique. Le
+rôle attend jusqu'à 10 minutes. Si l'erreur persiste, regarder ce processus sur le
+serveur (`ps -fp <numéro>`, le numéro est dans le message) : s'il travaille, attendre
+et relancer ; s'il est bloqué depuis longtemps, l'arrêter puis faire
+`sudo dpkg --configure -a`.
+
 ### Connexion SSH refusée après l'activation de RADIUS
 
 - le compte n'est pas connu du FortiAuthenticator, ou le serveur n'y est pas déclaré

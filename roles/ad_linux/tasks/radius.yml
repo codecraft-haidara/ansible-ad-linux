@@ -31,6 +31,7 @@
         state: present
         update_cache: true
         cache_valid_time: 3600
+        lock_timeout: 600
 
     # Comptes de secours et groupe exempté AVANT d'activer RADIUS dans PAM,
     # pour ne jamais couper leur accès.
