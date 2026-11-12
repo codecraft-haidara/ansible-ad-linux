@@ -257,6 +257,12 @@ Le compte de connexion n'existe pas sur ce serveur, ou son mot de passe y est di
 Indiquer le bon compte dans `inventory/host_vars/<serveur>.yml` (`ansible_user: ...`) et
 lancer ce serveur seul avec `--ask-pass --ask-become-pass`.
 
+### Le serveur ne résout pas le domaine, ou « Failed to update apt cache »
+
+Le DNS du serveur est absent ou ne pointe pas vers les contrôleurs de domaine. Voir
+`resolvectl status`. Sur Ubuntu, corriger `nameservers` dans `/etc/netplan/*.yaml`
+(adresses des DC, `search: [finance.mef]`), puis `sudo netplan apply`.
+
 ### Horloge non synchronisée
 
 Si `ad_ntp_servers` est renseigné, le rôle configure ces serveurs de temps et attend la

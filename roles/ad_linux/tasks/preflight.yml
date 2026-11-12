@@ -17,6 +17,28 @@
       {{ ansible_facts['hostname'] | length }} caractères (15 au plus).
     quiet: true
 
+# Sans DNS pointant vers les contrôleurs de domaine : ni découverte du domaine,
+# ni installation des paquets.
+- name: Résoudre le nom du domaine
+  ansible.builtin.command:
+    argv:
+      - getent
+      - hosts
+      - "{{ ad_domain }}"
+  register: ad_linux_dns
+  changed_when: false
+  failed_when: false
+
+- name: Vérifier que le DNS résout le domaine
+  ansible.builtin.assert:
+    that:
+      - ad_linux_dns.rc == 0
+    fail_msg: >-
+      Ce serveur ne résout pas « {{ ad_domain }} » : son DNS ne pointe pas vers
+      les contrôleurs de domaine. Vérifier « resolvectl status » ou
+      /etc/resolv.conf, corriger les serveurs DNS (netplan sur Ubuntu), puis relancer.
+    quiet: true
+
 - name: Lire l'état de la synchronisation NTP
   ansible.builtin.command:
     cmd: timedatectl show --property=NTPSynchronized --value
