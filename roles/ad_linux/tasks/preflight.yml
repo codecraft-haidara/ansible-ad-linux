@@ -24,19 +24,117 @@
   changed_when: false
   when: ad_require_ntp_sync | bool
 
+- name: Corriger la synchronisation de l'horloge
+  when:
+    - ad_require_ntp_sync | bool
+    - ad_linux_ntp.stdout | trim != 'yes'
+    - ad_ntp_servers | length > 0
+  block:
+    - name: Chercher chrony
+      ansible.builtin.stat:
+        path: "{{ ad_linux_chrony_conf }}"
+      register: ad_linux_chrony
+
+    - name: Chrony - déclarer les serveurs de temps
+      ansible.builtin.blockinfile:
+        path: "{{ ad_linux_chrony_conf }}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK ad_linux ntp"
+        insertbefore: BOF
+        block: |
+          {% for srv in ad_ntp_servers %}
+          server {{ srv }} iburst
+          {% endfor %}
+      when: ad_linux_chrony.stat.exists
+
+    - name: Chrony - redémarrer et activer le service
+      ansible.builtin.service:
+        name: "{{ ad_linux_chrony_service }}"
+        state: restarted
+        enabled: true
+      when: ad_linux_chrony.stat.exists
+
+    - name: Timesyncd - installer le service
+      ansible.builtin.apt:
+        name: systemd-timesyncd
+        state: present
+        lock_timeout: 600
+      when:
+        - not ad_linux_chrony.stat.exists
+        - ansible_facts['os_family'] == 'Debian'
+
+    - name: Timesyncd - créer le répertoire de configuration
+      ansible.builtin.file:
+        path: /etc/systemd/timesyncd.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: not ad_linux_chrony.stat.exists
+
+    - name: Timesyncd - déclarer les serveurs de temps
+      ansible.builtin.copy:
+        dest: /etc/systemd/timesyncd.conf.d/ad-linux.conf
+        content: |
+          # Géré par Ansible (rôle ad_linux)
+          [Time]
+          NTP={{ ad_ntp_servers | join(' ') }}
+        owner: root
+        group: root
+        mode: "0644"
+      when: not ad_linux_chrony.stat.exists
+
+    - name: Timesyncd - redémarrer et activer le service
+      ansible.builtin.service:
+        name: systemd-timesyncd
+        state: restarted
+        enabled: true
+      when: not ad_linux_chrony.stat.exists
+
+    - name: Activer la synchronisation NTP
+      ansible.builtin.command:
+        cmd: timedatectl set-ntp true
+      changed_when: true
+
+    - name: Attendre la synchronisation de l'horloge
+      ansible.builtin.command:
+        cmd: timedatectl show --property=NTPSynchronized --value
+      register: ad_linux_ntp_after
+      changed_when: false
+      failed_when: false
+      until: ad_linux_ntp_after.stdout | trim == 'yes'
+      retries: "{{ (ad_ntp_wait | int / 5) | round(0, 'ceil') | int }}"
+      delay: 5
+
 - name: Vérifier que l'horloge est synchronisée (Kerberos tolère 5 minutes d'écart)
   ansible.builtin.assert:
     that:
-      - ad_linux_ntp.stdout | trim == 'yes'
+      - ad_linux_ntp_final == 'yes'
     fail_msg: >-
-      Horloge non synchronisée par NTP (NTPSynchronized={{ ad_linux_ntp.stdout | trim }}).
-      Corriger chrony/systemd-timesyncd avant la jonction.
+      Horloge non synchronisée par NTP (NTPSynchronized={{ ad_linux_ntp_final }}).
+      {{ 'Les serveurs de temps ' ~ (ad_ntp_servers | join(', ')) ~ ' ne répondent pas depuis cet hôte (UDP 123).'
+         if (ad_ntp_servers | length > 0)
+         else 'Renseigner ad_ntp_servers pour que le rôle corrige, ou corriger chrony/systemd-timesyncd.' }}
     quiet: true
+  vars:
+    ad_linux_ntp_final: "{{ (ad_linux_ntp_after.stdout | default(ad_linux_ntp.stdout)) | trim }}"
   when: ad_require_ntp_sync | bool
+
+- name: Corriger le FQDN dans /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1 {{ ansible_facts['hostname'] }}.{{ ad_domain | lower }} {{ ansible_facts['hostname'] }}"
+    insertafter: '^127\.0\.0\.1\s'
+  when:
+    - ad_fix_fqdn | bool
+    - not (ansible_facts['fqdn'] | lower).endswith('.' ~ (ad_domain | lower))
 
 - name: Avertir si le FQDN n'est pas dans le domaine
   ansible.builtin.debug:
     msg: >-
       ATTENTION : le FQDN « {{ ansible_facts['fqdn'] }} » ne se termine pas par
-      .{{ ad_domain }}. Vérifier /etc/hosts et hostnamectl (enregistrement DNS et SPN).
-  when: not (ansible_facts['fqdn'] | lower).endswith('.' ~ (ad_domain | lower))
+      .{{ ad_domain }}. Vérifier /etc/hosts et hostnamectl (enregistrement DNS et SPN),
+      ou activer ad_fix_fqdn.
+  when:
+    - not (ad_fix_fqdn | bool)
+    - not (ansible_facts['fqdn'] | lower).endswith('.' ~ (ad_domain | lower))

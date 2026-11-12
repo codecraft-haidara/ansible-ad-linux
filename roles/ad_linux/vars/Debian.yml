@@ -24,3 +24,5 @@ ad_linux_radius_conf: /etc/pam_radius_auth.conf
 ad_linux_ssh_service: ssh
 # Groupe local donnant sudo complet
 ad_linux_local_admin_group: sudo
+ad_linux_chrony_conf: /etc/chrony/chrony.conf
+ad_linux_chrony_service: chrony

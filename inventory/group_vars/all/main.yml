@@ -7,6 +7,23 @@ ad_join_user: al.haidara
 # Le mot de passe vient du vault (voir vault.yml.example)
 ad_join_password: "{{ vault_ad_join_password }}"
 
+# Serveurs de temps : si l'horloge d'un serveur n'est pas synchronisée, le rôle
+# les configure puis attend la synchronisation (les DC servent le temps).
+ad_ntp_servers:
+  - 10.10.1.18
+  - 10.10.1.27
+  - 10.10.1.37
+
+# Corriger /etc/hosts quand le FQDN n'est pas en .finance.mef (avant la jonction).
+# À activer en connaissance de cause : des applications peuvent dépendre du nom complet.
+ad_fix_fqdn: false
+
+# Connexion d'Ansible : ranger le mot de passe de caisff dans le vault
+# (vault_caisff_password) puis décommenter, pour ne plus taper que le mot de
+# passe du vault.
+# ansible_password: "{{ vault_caisff_password }}"
+# ansible_become_password: "{{ vault_caisff_password }}"
+
 # OU de destination des objets ordinateur (vide = conteneur par défaut)
 # ad_computer_ou: "OU=Serveurs Linux,DC=finance,DC=mef"
 ad_computer_ou: ""

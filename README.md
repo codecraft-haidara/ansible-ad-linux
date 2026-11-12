@@ -96,6 +96,9 @@ tard, définir `dba_enabled: true` et `dba_group` pour les hôtes concernés.
 | `ad_join_password` | `vault_ad_join_password` | Mot de passe, fourni par le vault |
 | `ad_computer_ou` | `""` | OU des objets ordinateur ; vide = conteneur par défaut |
 | `ad_require_ntp_sync` | `true` | Refuser de continuer si l'horloge n'est pas synchronisée |
+| `ad_ntp_servers` | `[]` | Serveurs de temps configurés si l'horloge n'est pas synchronisée |
+| `ad_ntp_wait` | `90` | Attente de la synchronisation après correction, en secondes |
+| `ad_fix_fqdn` | `false` | Écrire le nom complet dans `/etc/hosts` si le FQDN est hors domaine |
 | `ad_use_fully_qualified_names` | `true` | Connexion en `utilisateur@finance.mef` ; ajoute `@finance.mef` aux groupes dans sudoers |
 | `ad_admin_groups` | `[]` | Groupes AD : connexion + `ALL=(ALL:ALL) ALL` |
 | `ad_host_login_groups` | `[]` | Groupes AD autorisés à se connecter, sans sudo |
@@ -227,6 +230,37 @@ sudo a mis trop de temps à répondre, souvent juste après la jonction, quand S
 `ansible.cfg` porte le délai à 60 secondes ; relancer simplement le playbook, il reprend
 là où il s'est arrêté. Si Ansible ignore `ansible.cfg` (dépôt sous `/mnt/c` dans WSL),
 faire `export ANSIBLE_CONFIG="$PWD/ansible.cfg"` ou cloner le dépôt dans `~`.
+
+### « Ansible requires Python 3.9 or newer on the target »
+
+Le serveur est trop ancien pour votre version d'Ansible (Ubuntu 20.04 n'a que Python 3.8).
+Le rôle n'y peut rien : l'erreur survient avant sa première tâche. Soit mettre le serveur
+à niveau, soit lancer ces serveurs-là avec un Ansible plus ancien, installé à part :
+
+```bash
+python3 -m venv ~/ansible-2.17
+```
+
+```bash
+~/ansible-2.17/bin/pip install 'ansible-core>=2.17,<2.18'
+```
+
+```bash
+~/ansible-2.17/bin/ansible-galaxy collection install -r requirements.yml
+```
+
+puis `~/ansible-2.17/bin/ansible-playbook playbooks/ad_linux.yml --limit <serveur> ...`.
+
+### « Permission denied (publickey,password) »
+
+Le compte de connexion n'existe pas sur ce serveur, ou son mot de passe y est différent.
+Indiquer le bon compte dans `inventory/host_vars/<serveur>.yml` (`ansible_user: ...`) et
+lancer ce serveur seul avec `--ask-pass --ask-become-pass`.
+
+### Horloge non synchronisée
+
+Si `ad_ntp_servers` est renseigné, le rôle configure ces serveurs de temps et attend la
+synchronisation. S'il échoue encore, le serveur ne les joint pas en UDP 123.
 
 ### « Unable to acquire the dpkg frontend lock »
 

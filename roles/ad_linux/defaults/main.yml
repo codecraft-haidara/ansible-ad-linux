@@ -11,6 +11,18 @@ ad_computer_ou: ""
 
 # Refuser de continuer si l'horloge n'est pas synchronisée par NTP
 ad_require_ntp_sync: true
+# Serveurs de temps (en général les contrôleurs de domaine). S'ils sont
+# renseignés et que l'horloge n'est PAS synchronisée, le rôle les configure
+# (chrony s'il est installé, sinon systemd-timesyncd) puis attend la
+# synchronisation. Un serveur déjà synchronisé n'est pas modifié.
+ad_ntp_servers: []
+# Délai d'attente de la synchronisation après correction, en secondes
+ad_ntp_wait: 90
+
+# true : si le FQDN n'est pas dans le domaine, écrire dans /etc/hosts la ligne
+# « 127.0.1.1 <nom>.<domaine> <nom> ». À faire AVANT la jonction. Désactivé par
+# défaut : certaines applications dépendent du nom complet de la machine.
+ad_fix_fqdn: false
 
 # ------------------------------------------------------------------- SSSD ---
 # True : connexion sous la forme utilisateur@finance.mef, et les groupes
