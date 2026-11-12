@@ -32,9 +32,9 @@
     option: "{{ item.option }}"
     value: "{{ item.value }}"
     create: false
-    owner: root
-    group: root
-    mode: "0600"
+    # Ni propriétaire ni mode imposés : à partir de SSSD 2.10 (Ubuntu 25.04+),
+    # le service remet le fichier en root:sssd 0640 à chaque démarrage. Les
+    # forcer ici ferait redémarrer sssd à chaque passage.
   loop:
     - option: access_provider
       value: simple
